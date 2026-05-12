@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>The Reckoning — Hangman</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --ink:#1a1410;--parchment:#e8d9a8;
+  --gold:#c8a84a;--gdim:rgba(200,168,74,0.4);
+  --red:#c84040;--p1:#c8a84a;--p2:#4a8ac8;
+}
+html{height:100%;}
+body{
+  min-height:100%;width:100%;background:#0f0c08;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:14px 0 40px;font-family:'IM Fell English',serif;
+  overscroll-behavior:none;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%,rgba(200,168,74,.28) 0%,transparent 100%),
+    radial-gradient(1px 1px at 78% 9%, rgba(200,168,74,.20) 0%,transparent 100%),
+    radial-gradient(1px 1px at 42% 66%,rgba(200,168,74,.16) 0%,transparent 100%),
+    radial-gradient(1px 1px at 88% 44%,rgba(200,168,74,.22) 0%,transparent 100%),
+    radial-gradient(1px 1px at 6%  82%,rgba(200,168,74,.12) 0%,transparent 100%),
+    radial-gradient(1px 1px at 62% 91%,rgba(200,168,74,.16) 0%,transparent 100%);
+}
+
+/* ── CARD ── */
+.card{
+  position:relative;width:min(500px,96vw);
+  background:var(--ink);border:1px solid rgba(180,140,60,.25);
+  z-index:1;overflow:hidden;
+  animation:cardIn .7s cubic-bezier(.2,0,0,1) both;
+}
+@keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+.card::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:repeating-linear-gradient(88deg,transparent,transparent 38px,rgba(255,255,255,.01) 38px,rgba(255,255,255,.01) 39px);}
+.card::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 55% 45% at 20% 30%,rgba(180,120,30,.06) 0%,transparent 60%),
+             radial-gradient(ellipse 40% 55% at 80% 70%,rgba(80,30,10,.10) 0%,transparent 55%);}
+.orn{position:absolute;width:20px;height:20px;border-color:rgba(180,140,60,.4);border-style:solid;z-index:3;}
+.orn.tl{top:7px;left:7px;border-width:1px 0 0 1px;}
+.orn.tr{top:7px;right:7px;border-width:1px 1px 0 0;}
+.orn.bl{bottom:7px;left:7px;border-width:0 0 1px 1px;}
+.orn.br{bottom:7px;right:7px;border-width:0 1px 1px 0;}
+.iborder{position:absolute;inset:12px;border:.5px solid rgba(180,140,60,.09);pointer-events:none;z-index:3;}
+.inner{position:relative;z-index:2;padding:22px 18px 26px;}
+
+/* ── HEADER ── */
+.hdr{text-align:center;margin-bottom:16px;}
+.gtitle{
+  font-family:'Cinzel',serif;font-size:clamp(20px,6vw,26px);font-weight:700;
+  color:var(--gold);letter-spacing:.2em;text-transform:uppercase;line-height:1;
+  animation:glow 3s ease-in-out infinite alternate;
+}
+@keyframes glow{from{text-shadow:0 0 10px rgba(200,168,74,.2);}to{text-shadow:0 0 26px rgba(200,168,74,.5),0 0 55px rgba(200,168,74,.12);}}
+.gsub{font-style:italic;font-size:12px;color:rgba(200,168,74,.42);letter-spacing:.08em;margin-top:4px;}
+.dvdr{display:flex;align-items:center;gap:12px;justify-content:center;margin:8px 0 0;}
+.dline{flex:1;max-width:80px;height:.5px;background:linear-gradient(90deg,transparent,rgba(180,140,60,.4),transparent);}
+.ddiamond{width:6px;height:6px;background:var(--gold);transform:rotate(45deg);opacity:.7;}
+
+/* ── SCREENS ── */
+.scr{display:none;}
+.scr.active{display:block;}
+
+/* ══ MODE SCREEN ══ */
+#mode-scr{text-align:center;padding:10px 0 4px;}
+.mprompt{font-size:16px;font-style:italic;color:var(--parchment);opacity:.7;margin-bottom:18px;line-height:1.5;}
+.mbtns{display:flex;flex-direction:column;gap:10px;}
+.mbtn{
+  font-family:'Cinzel',serif;font-size:13px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+  padding:17px 16px;border:1px solid rgba(180,140,60,.35);background:rgba(180,140,60,.08);
+  color:var(--gold);cursor:pointer;width:100%;border-radius:2px;
+  display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s;
+}
+.mbtn:active{transform:scale(.97);background:rgba(180,140,60,.22);}
+.mbtn.b2{color:var(--p2);border-color:rgba(74,138,200,.35);background:rgba(74,138,200,.08);}
+.mbtn.b2:active{background:rgba(74,138,200,.22);}
+
+/* ══ SETUP SCREEN ══ */
+#setup-scr{text-align:center;}
+.setup-title{font-family:'Cinzel',serif;font-size:14px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--parchment);opacity:.7;margin-bottom:14px;}
+.player-steps{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
+.pstep{
+  display:flex;align-items:center;gap:12px;padding:13px 14px;
+  border:.5px solid rgba(180,140,60,.15);background:rgba(255,255,255,.02);transition:all .3s;border-radius:2px;
+}
+.pstep.done1{border-color:rgba(200,168,74,.5);background:rgba(200,168,74,.07);}
+.pstep.done2{border-color:rgba(74,138,200,.5);background:rgba(74,138,200,.07);}
+.pstep-badge{
+  font-family:'Cinzel',serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  padding:4px 10px;border:1px solid currentColor;flex-shrink:0;
+}
+.pstep-badge.b1{color:var(--p1);border-color:rgba(200,168,74,.5);}
+.pstep-badge.b2{color:var(--p2);border-color:rgba(74,138,200,.5);}
+.pstep-info{flex:1;text-align:left;}
+.pstep-label{font-style:italic;font-size:13px;color:rgba(232,217,168,.45);}
+.pstep-state{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-top:2px;}
+.pstep-state.pend{color:rgba(200,168,74,.3);}
+.pstep-state.set1{color:#70d090;}
+.pstep-state.set2{color:#70d090;}
+.pstep-tick{font-size:18px;opacity:0;transition:opacity .3s;}
+.pstep.done1 .pstep-tick,.pstep.done2 .pstep-tick{opacity:1;}
+
+.sbtn{
+  font-family:'Cinzel',serif;font-size:13px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  width:100%;padding:15px;border:none;cursor:pointer;border-radius:2px;transition:all .2s;margin-bottom:8px;
+}
+.sbtn.s1{background:var(--p1);color:#1a1410;}
+.sbtn.s1:active{background:#dfb84a;transform:scale(.97);}
+.sbtn.s2{background:var(--p2);color:#0f0c08;}
+.sbtn.s2:active{background:#6aaae0;transform:scale(.97);}
+.sbtn:disabled{opacity:.22;pointer-events:none;}
+.go-btn{
+  font-family:'Cinzel',serif;font-size:13px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  width:100%;padding:15px;border:1px solid rgba(180,140,60,.2);cursor:default;border-radius:2px;transition:all .4s;
+  background:rgba(180,140,60,.06);color:rgba(200,168,74,.3);margin-top:4px;
+}
+.go-btn.ready{background:linear-gradient(135deg,rgba(200,168,74,.18),rgba(74,138,200,.18));color:var(--parchment);border-color:rgba(180,140,60,.5);cursor:pointer;}
+.go-btn.ready:active{transform:scale(.97);}
+
+/* ══ GAME SCREEN ══ */
+/* Duel scoreboard */
+.duel-bar{display:flex;align-items:stretch;border:.5px solid rgba(180,140,60,.18);margin-bottom:12px;}
+.dp{flex:1;padding:9px 10px;text-align:center;background:rgba(255,255,255,.02);transition:all .3s;border-bottom:2px solid transparent;}
+.dp.a1{background:rgba(200,168,74,.08);border-bottom-color:var(--p1);}
+.dp.a2{background:rgba(74,138,200,.08);border-bottom-color:var(--p2);}
+.dp-name{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.26em;text-transform:uppercase;color:rgba(232,217,168,.38);margin-bottom:2px;transition:color .3s;}
+.dp.a1 .dp-name{color:rgba(200,168,74,.75);}
+.dp.a2 .dp-name{color:rgba(74,138,200,.85);}
+.dp-score{font-family:'Cinzel',serif;font-size:24px;font-weight:700;line-height:1;color:var(--parchment);}
+.dp.a1 .dp-score{color:var(--p1);}
+.dp.a2 .dp-score{color:var(--p2);}
+.dp-wins{font-size:9px;font-style:italic;color:rgba(232,217,168,.28);}
+.dp-tag{font-family:'Cinzel',serif;font-size:7px;letter-spacing:.22em;text-transform:uppercase;margin-top:3px;opacity:0;transition:opacity .3s;}
+.dp.a1 .dp-tag{opacity:1;color:rgba(200,168,74,.6);}
+.dp.a2 .dp-tag{opacity:1;color:rgba(74,138,200,.7);}
+.dsep{display:flex;align-items:center;padding:0 8px;color:rgba(232,217,168,.18);font-size:16px;}
+
+/* Two gallows */
+.gallows-row{display:flex;gap:6px;margin-bottom:10px;}
+.gp{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  padding:6px 4px 8px;
+  border:.5px solid rgba(180,140,60,.1);background:rgba(255,255,255,.015);
+  transition:all .3s;border-radius:2px;
+}
+.gp.a1{border-color:rgba(200,168,74,.38);background:rgba(200,168,74,.04);}
+.gp.a2{border-color:rgba(74,138,200,.38);background:rgba(74,138,200,.04);}
+.gp svg{width:100%;max-width:140px;height:auto;display:block;}
+.gpips{display:flex;gap:5px;margin-top:6px;justify-content:center;}
+.gpip{width:9px;height:9px;border-radius:50%;transition:all .4s;}
+.gpip.a1{background:var(--p1);box-shadow:0 0 5px rgba(200,168,74,.5);}
+.gpip.a2{background:var(--p2);box-shadow:0 0 5px rgba(74,138,200,.5);}
+.gpip.spent{background:var(--red);box-shadow:0 0 4px rgba(200,64,64,.4);}
+.glabel{font-family:'Cinzel',serif;font-size:8px;letter-spacing:.22em;text-transform:uppercase;margin-top:5px;opacity:.5;}
+.gp.a1 .glabel{color:var(--p1);opacity:.9;}
+.gp.a2 .glabel{color:var(--p2);opacity:.9;}
+
+/* Guess info bar */
+.guess-info{display:flex;gap:8px;margin-bottom:10px;}
+.gi-panel{flex:1;background:rgba(255,255,255,.022);border:.5px solid rgba(180,140,60,.16);padding:9px 11px;}
+.gi-label{font-family:'Cinzel',serif;font-size:8px;letter-spacing:.3em;text-transform:uppercase;color:rgba(200,168,74,.45);margin-bottom:5px;}
+.gi-val{font-size:15px;color:var(--parchment);line-height:1.3;}
+.gi-val .v{color:var(--gold);font-weight:600;}
+.chips{display:flex;flex-wrap:wrap;gap:4px;min-height:20px;align-items:flex-start;}
+.chip{font-family:'Cinzel',serif;font-size:11px;color:#e07070;background:rgba(200,64,64,.18);border:.5px solid rgba(200,64,64,.3);padding:2px 7px;animation:pop .2s cubic-bezier(.34,1.56,.64,1) both;}
+@keyframes pop{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+.noguess{font-style:italic;font-size:12px;color:rgba(200,168,74,.28);}
+
+/* Status */
+.status-wrap{min-height:38px;display:flex;align-items:center;justify-content:center;text-align:center;margin-bottom:10px;}
+.status{font-size:14px;font-style:italic;letter-spacing:.03em;line-height:1.45;transition:color .3s;}
+.s-idle{color:rgba(200,168,74,.42);}
+.s-low{color:#78b8e8;}
+.s-high{color:#e8a060;}
+.s-win{color:#70d090;font-size:15px;}
+.s-dead{color:var(--red);font-size:15px;}
+
+/* Numpad */
+.npdisp-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.npval{
+  flex:1;font-family:'Cinzel',serif;font-size:28px;font-weight:700;
+  color:var(--parchment);background:rgba(255,255,255,.04);border:.5px solid rgba(180,140,60,.35);
+  padding:8px 12px;text-align:center;letter-spacing:.1em;transition:all .2s;min-width:0;
+}
+.npval.has{color:var(--gold);border-color:rgba(180,140,60,.65);}
+.npval.emp{color:rgba(200,168,74,.22);font-size:13px;font-style:italic;font-weight:400;}
+.guess-btn{
+  font-family:'Cinzel',serif;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  color:#1a1410;background:var(--gold);border:none;padding:12px 16px;cursor:pointer;transition:all .2s;flex-shrink:0;border-radius:2px;
+}
+.guess-btn:active:not(:disabled){transform:scale(.95);background:#dfb84a;}
+.guess-btn:disabled{background:rgba(180,140,60,.2);color:rgba(200,168,74,.3);cursor:default;}
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:12px;}
+.nk{
+  font-family:'Cinzel',serif;font-size:18px;font-weight:600;
+  color:var(--parchment);background:rgba(255,255,255,.04);
+  border:.5px solid rgba(180,140,60,.2);padding:0;height:50px;
+  cursor:pointer;border-radius:2px;
+  display:flex;align-items:center;justify-content:center;user-select:none;transition:all .15s;
+}
+.nk:active{background:rgba(200,168,74,.22);border-color:rgba(180,140,60,.6);transform:scale(.93);}
+.nk.del{font-size:15px;color:rgba(200,168,74,.55);}
+.nk.del:active{background:rgba(200,64,64,.15);}
+.numpad.off .nk{opacity:.25;pointer-events:none;}
+
+/* Bottom row */
+.brow{display:flex;gap:8px;}
+.new-btn{flex:1;font-family:'Cinzel',serif;font-size:10px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:rgba(200,168,74,.5);background:transparent;border:.5px solid rgba(180,140,60,.2);padding:12px 8px;cursor:pointer;transition:all .3s;border-radius:2px;}
+.new-btn:active{color:var(--gold);background:rgba(180,140,60,.1);}
+.menu-btn{font-family:'Cinzel',serif;font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(200,168,74,.35);background:transparent;border:.5px solid rgba(180,140,60,.12);padding:12px 14px;cursor:pointer;transition:all .3s;white-space:nowrap;border-radius:2px;}
+.menu-btn:active{color:rgba(200,168,74,.65);}
+
+/* ══ COVER OVERLAY ══ */
+.cov{display:none;position:fixed;inset:0;background:rgba(10,8,5,.96);z-index:100;align-items:center;justify-content:center;padding:16px;}
+.cov.show{display:flex;}
+.cov-box{padding:28px 22px;border:1px solid rgba(74,138,200,.35);background:var(--ink);max-width:340px;width:100%;border-radius:2px;text-align:center;}
+.cov-box.c1{border-color:rgba(200,168,74,.45);}
+.cov-title{font-family:'Cinzel',serif;font-size:16px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;}
+.cov-title.t1{color:var(--p1);}
+.cov-title.t2{color:var(--p2);}
+.cov-desc{font-style:italic;font-size:13px;color:rgba(232,217,168,.52);margin-bottom:18px;line-height:1.6;}
+.cov-val{
+  font-family:'Cinzel',serif;font-size:34px;font-weight:700;
+  color:var(--parchment);background:rgba(255,255,255,.04);
+  border:.5px solid rgba(200,168,74,.45);padding:10px 18px;
+  display:inline-block;min-width:100px;margin-bottom:14px;letter-spacing:.1em;transition:all .2s;border-radius:2px;
+}
+.cov-val.has{color:var(--gold);border-color:rgba(200,168,74,.8);}
+.cov-val.c2has{color:var(--p2);border-color:rgba(74,138,200,.8);}
+.cov-val.emp{color:rgba(200,168,74,.22);font-size:13px;font-style:italic;font-weight:400;}
+.cov-numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:12px;}
+.cnk{
+  font-family:'Cinzel',serif;font-size:18px;font-weight:600;
+  color:var(--parchment);background:rgba(255,255,255,.04);
+  border:.5px solid rgba(180,140,60,.2);height:50px;
+  cursor:pointer;border-radius:2px;
+  display:flex;align-items:center;justify-content:center;user-select:none;transition:all .15s;
+}
+.cnk:active{background:rgba(200,168,74,.22);transform:scale(.93);}
+.cnk.del{font-size:15px;color:rgba(200,168,74,.55);}
+.cov-box.c2 .cnk{border-color:rgba(74,138,200,.2);}
+.cov-box.c2 .cnk:active{background:rgba(74,138,200,.22);}
+.cov-confirm{
+  font-family:'Cinzel',serif;font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:#0f0c08;background:var(--p1);border:none;padding:13px;width:100%;cursor:pointer;transition:all .2s;border-radius:2px;
+}
+.cov-confirm.c2btn{background:var(--p2);}
+.cov-confirm:active{transform:scale(.97);opacity:.85;}
+.cov-err{font-size:12px;font-style:italic;color:var(--red);margin-top:7px;min-height:17px;}
+
+/* ══ WIN OVERLAY ══ */
+.win-ov{display:none;position:fixed;inset:0;background:rgba(10,8,5,.92);z-index:200;align-items:center;justify-content:center;padding:16px;}
+.win-ov.show{display:flex;}
+.win-box{padding:32px 24px;border:1px solid rgba(180,140,60,.35);background:var(--ink);max-width:340px;width:100%;border-radius:2px;text-align:center;animation:pop .35s cubic-bezier(.34,1.56,.64,1) both;}
+.wcrown{font-size:46px;margin-bottom:10px;}
+.wtitle{font-family:'Cinzel',serif;font-size:20px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;margin-bottom:8px;}
+.wtitle.w1{color:var(--p1);}
+.wtitle.w2{color:var(--p2);}
+.wsub{font-style:italic;font-size:13px;color:rgba(232,217,168,.52);margin-bottom:10px;line-height:1.6;}
+.wscore{display:flex;justify-content:center;gap:24px;margin-bottom:20px;padding:10px 0;border-top:.5px solid rgba(180,140,60,.18);border-bottom:.5px solid rgba(180,140,60,.18);}
+.wsc-item{text-align:center;}
+.wsc-name{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:rgba(232,217,168,.4);margin-bottom:3px;}
+.wsc-num{font-family:'Cinzel',serif;font-size:26px;font-weight:700;color:var(--parchment);}
+.wsc-item.w1 .wsc-num{color:var(--p1);}
+.wsc-item.w2 .wsc-num{color:var(--p2);}
+.wbtns{display:flex;flex-direction:column;gap:8px;}
+.wbtn{font-family:'Cinzel',serif;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;padding:13px;cursor:pointer;border:none;transition:all .2s;border-radius:2px;}
+.wbtn.pri{background:var(--gold);color:#1a1410;}
+.wbtn.pri:active{background:#dfb84a;transform:scale(.97);}
+.wbtn.sec{background:transparent;color:rgba(200,168,74,.52);border:.5px solid rgba(180,140,60,.28);}
+.wbtn.sec:active{color:var(--gold);}
+
+/* Candles & animations */
+@keyframes f1{0%,100%{opacity:.9;transform:scaleX(1) scaleY(1)}25%{opacity:.75;transform:scaleX(.88) scaleY(1.1)}50%{opacity:1;transform:scaleX(1.1) scaleY(.94)}75%{opacity:.8;transform:scaleX(.94) scaleY(1.05)}}
+@keyframes f2{0%,100%{opacity:.85;transform:scaleX(1) scaleY(1)}33%{opacity:1;transform:scaleX(1.1) scaleY(.88)}66%{opacity:.7;transform:scaleX(.84) scaleY(1.15)}}
+.fl1{animation:f1 1.8s ease-in-out infinite;transform-origin:center bottom;}
+.fl2{animation:f2 2.3s ease-in-out infinite;transform-origin:center bottom;}
+.pe{animation:pe .35s cubic-bezier(.2,0,0,1) both;}
+@keyframes pe{from{opacity:0}to{opacity:1}}
+.rsway{animation:rsway 2s ease-in-out infinite;}
+@keyframes rsway{0%,100%{transform:rotate(0)}25%{transform:rotate(3deg)}75%{transform:rotate(-3deg)}}
+.rs1{transform-origin:92px 14px;}
+.rs2{transform-origin:92px 14px;}
+</style>
+</head>
+<body>
+
+<!-- ══ COVER overlay (secret number entry) ══ -->
+<div class="cov" id="cov">
+  <div class="cov-box" id="cov-box">
+    <div class="cov-title" id="cov-title">Player 1</div>
+    <p class="cov-desc" id="cov-desc">Set your secret number (1–100). The other player must not look!</p>
+    <div class="cov-val emp" id="cov-display">tap below</div>
+    <div class="cov-numpad" id="cov-numpad">
+      <button class="cnk" data-v="1">1</button><button class="cnk" data-v="2">2</button><button class="cnk" data-v="3">3</button>
+      <button class="cnk" data-v="4">4</button><button class="cnk" data-v="5">5</button><button class="cnk" data-v="6">6</button>
+      <button class="cnk" data-v="7">7</button><button class="cnk" data-v="8">8</button><button class="cnk" data-v="9">9</button>
+      <button class="cnk" data-v="0">0</button><button class="cnk" data-v="00">00</button><button class="cnk del" data-v="del">⌫</button>
+    </div>
+    <button class="cov-confirm" id="cov-confirm">Confirm</button>
+    <div class="cov-err" id="cov-err"></div>
+  </div>
+</div>
+
+<!-- ══ WIN overlay ══ -->
+<div class="win-ov" id="win-ov">
+  <div class="win-box">
+    <div class="wcrown" id="wcrown">👑</div>
+    <div class="wtitle" id="wtitle">Player 1 Wins!</div>
+    <p class="wsub" id="wsub"></p>
+    <div class="wscore">
+      <div class="wsc-item" id="wsc1"><div class="wsc-name">Player 1</div><div class="wsc-num" id="ws1">0</div></div>
+      <div class="wsc-item" id="wsc2"><div class="wsc-name">Player 2</div><div class="wsc-num" id="ws2">0</div></div>
+    </div>
+    <div class="wbtns">
+      <button class="wbtn pri" id="w-next">Next Round</button>
+      <button class="wbtn sec" id="w-menu">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CARD ══ -->
+<div class="card">
+  <div class="orn tl"></div><div class="orn tr"></div><div class="orn bl"></div><div class="orn br"></div>
+  <div class="iborder"></div>
+  <div class="inner">
+
+    <div class="hdr">
+      <h1 class="gtitle">The Reckoning</h1>
+      <p class="gsub" id="gsub">A game of numbers &amp; fate</p>
+      <div class="dvdr"><div class="dline"></div><div class="ddiamond"></div><div class="dline"></div></div>
+    </div>
+
+    <!-- ══ MODE SCREEN ══ -->
+    <div class="scr active" id="mode-scr">
+      <p class="mprompt">Choose thy mode of play</p>
+      <div class="mbtns">
+        <button class="mbtn" id="btn1p">☽ &nbsp;Solo — vs Fate</button>
+        <button class="mbtn b2" id="btn2p">⚔ &nbsp;Two Players — Duel</button>
+      </div>
+    </div>
+
+    <!-- ══ SETUP SCREEN ══ -->
+    <div class="scr" id="setup-scr">
+      <p class="setup-title">Both Players Set Their Numbers</p>
+      <div class="player-steps">
+        <div class="pstep" id="step1">
+          <span class="pstep-badge b1">P1</span>
+          <div class="pstep-info">
+            <div class="pstep-label">Player 1 sets a secret number</div>
+            <div class="pstep-state pend" id="st1">Waiting…</div>
+          </div>
+          <span class="pstep-tick" id="tk1">✓</span>
+        </div>
+        <div class="pstep" id="step2">
+          <span class="pstep-badge b2">P2</span>
+          <div class="pstep-info">
+            <div class="pstep-label">Player 2 sets a secret number</div>
+            <div class="pstep-state pend" id="st2">Waiting…</div>
+          </div>
+          <span class="pstep-tick" id="tk2">✓</span>
+        </div>
+      </div>
+      <button class="sbtn s1" id="sbtn1">Player 1 — Set Number</button>
+      <button class="sbtn s2" id="sbtn2" disabled>Player 2 — Set Number</button>
+      <button class="go-btn" id="go-btn" disabled>Begin the Duel ⚔</button>
+      <button class="menu-btn" id="setup-menu" style="width:100%;margin-top:8px;padding:12px;">↩ Main Menu</button>
+    </div>
+
+    <!-- ══ GAME SCREEN (Solo) ══ -->
+    <div class="scr" id="solo-scr">
+
+      <!-- Single scaffold -->
+      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:10px;">
+        <svg id="solo-svg" viewBox="0 0 220 200" style="width:min(200px,55vw);height:auto;">
+          <ellipse cx="110" cy="193" rx="70" ry="5" fill="rgba(0,0,0,0.35)"/>
+          <line x1="16" y1="186" x2="204" y2="186" stroke="#7a6030" stroke-width="3" stroke-linecap="round"/>
+          <rect x="52" y="10" width="8" height="176" fill="#7a6030" rx="2"/>
+          <rect x="52" y="10" width="88" height="8" fill="#7a6030" rx="2"/>
+          <line x1="60" y1="42" x2="90" y2="14" stroke="#6b5530" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+          <line id="sr" x1="137" y1="18" x2="137" y2="38" stroke="#9a8050" stroke-width="2" stroke-linecap="round"/>
+          <rect x="18" y="168" width="8" height="18" fill="#5a4020" rx="1"/>
+          <ellipse cx="22" cy="165" rx="3" ry="4" fill="#e8b850" opacity=".9" class="fl2"/>
+          <ellipse cx="22" cy="162" rx="1.5" ry="2.5" fill="#fff5cc" opacity=".7" class="fl2"/>
+          <rect x="194" y="168" width="8" height="18" fill="#5a4020" rx="1"/>
+          <ellipse cx="198" cy="165" rx="3" ry="4" fill="#e8b850" opacity=".9" class="fl1"/>
+          <ellipse cx="198" cy="162" rx="1.5" ry="2.5" fill="#fff5cc" opacity=".7" class="fl1"/>
+          <g id="sbg">
+            <circle id="s0" cx="137" cy="50" r="14" fill="none" stroke="#c8b080" stroke-width="1.8" visibility="hidden"/>
+            <line   id="s1" x1="137" y1="64" x2="137" y2="116" stroke="#c8b080" stroke-width="1.8" stroke-linecap="round" visibility="hidden"/>
+            <line   id="s2" x1="137" y1="84" x2="116" y2="104" stroke="#c8b080" stroke-width="1.8" stroke-linecap="round" visibility="hidden"/>
+            <line   id="s3" x1="137" y1="84" x2="158" y2="104" stroke="#c8b080" stroke-width="1.8" stroke-linecap="round" visibility="hidden"/>
+            <line   id="s4" x1="137" y1="116" x2="118" y2="150" stroke="#c8b080" stroke-width="1.8" stroke-linecap="round" visibility="hidden"/>
+            <line   id="s5" x1="137" y1="116" x2="156" y2="150" stroke="#c8b080" stroke-width="1.8" stroke-linecap="round" visibility="hidden"/>
+            <g id="sdead" visibility="hidden">
+              <line x1="130" y1="44" x2="134" y2="48" stroke="#c84040" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="134" y1="44" x2="130" y2="48" stroke="#c84040" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="140" y1="44" x2="144" y2="48" stroke="#c84040" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="144" y1="44" x2="140" y2="48" stroke="#c84040" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M130 57 Q137 52 144 57" fill="none" stroke="#c84040" stroke-width="1.8" stroke-linecap="round"/>
+            </g>
+            <circle id="shalo" cx="137" cy="36" r="10" fill="none" stroke="#c8a84a" stroke-width="1.2" stroke-dasharray="4 4" visibility="hidden" opacity=".8"/>
+            <g id="swin" visibility="hidden">
+              <circle cx="133" cy="47" r="2" fill="#70d090"/>
+              <circle cx="141" cy="47" r="2" fill="#70d090"/>
+              <path d="M131 55 Q137 60 143 55" fill="none" stroke="#70d090" stroke-width="1.8" stroke-linecap="round"/>
+            </g>
+          </g>
+        </svg>
+        <div class="gpips" id="solo-pips" style="margin-top:8px;"></div>
+        <div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:.28em;text-transform:uppercase;color:var(--gdim);margin-top:5px;">Chances left</div>
+      </div>
+
+      <div class="guess-info">
+        <div class="gi-panel">
+          <div class="gi-label">Range</div>
+          <div class="gi-val" id="solo-range">1 – <span class="v">100</span></div>
+        </div>
+        <div class="gi-panel">
+          <div class="gi-label">Wrong</div>
+          <div class="chips" id="solo-chips"><span class="noguess">–</span></div>
+        </div>
+      </div>
+
+      <div class="status-wrap"><div class="status s-idle" id="solo-status">What number dost thou name?</div></div>
+
+      <div class="npdisp-row">
+        <div class="npval emp" id="solo-npval">tap below</div>
+        <button class="guess-btn" id="solo-gbtn">Guess</button>
+      </div>
+      <div class="numpad" id="solo-numpad">
+        <button class="nk" data-v="1">1</button><button class="nk" data-v="2">2</button><button class="nk" data-v="3">3</button>
+        <button class="nk" data-v="4">4</button><button class="nk" data-v="5">5</button><button class="nk" data-v="6">6</button>
+        <button class="nk" data-v="7">7</button><button class="nk" data-v="8">8</button><button class="nk" data-v="9">9</button>
+        <button class="nk" data-v="0">0</button><button class="nk" data-v="00">00</button><button class="nk del" data-v="del">⌫</button>
+      </div>
+      <div class="brow">
+        <button class="new-btn" id="solo-new">✦ New Game</button>
+        <button class="menu-btn" id="solo-menu">Menu</button>
+      </div>
+    </div>
+
+    <!-- ══ GAME SCREEN (Duel) ══ -->
+    <div class="scr" id="duel-scr">
+
+      <!-- Scoreboard -->
+      <div class="duel-bar">
+        <div class="dp" id="dp1">
+          <div class="dp-name">Player 1</div>
+          <div class="dp-score" id="dp1s">0</div>
+          <div class="dp-wins">wins</div>
+          <div class="dp-tag" id="dp1tag">▶ Guessing</div>
+        </div>
+        <div class="dsep">·</div>
+        <div class="dp" id="dp2">
+          <div class="dp-name">Player 2</div>
+          <div class="dp-score" id="dp2s">0</div>
+          <div class="dp-wins">wins</div>
+          <div class="dp-tag" id="dp2tag">▶ Guessing</div>
+        </div>
+      </div>
+
+      <!-- Two gallows -->
+      <div class="gallows-row">
+        <!-- P1 gallows: hangs when P1 fails to guess P2's number -->
+        <div class="gp" id="gp1">
+          <svg viewBox="0 0 184 200" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="92" cy="193" rx="60" ry="4.5" fill="rgba(0,0,0,0.35)"/>
+            <line x1="10" y1="186" x2="174" y2="186" stroke="#7a6030" stroke-width="2.5" stroke-linecap="round"/>
+            <rect x="42" y="10" width="7" height="176" fill="#7a6030" rx="1.5"/>
+            <rect x="42" y="10" width="74" height="7" fill="#7a6030" rx="1.5"/>
+            <line x1="49" y1="38" x2="75" y2="14" stroke="#6b5530" stroke-width="1.5" stroke-linecap="round" opacity=".7"/>
+            <line id="r1" x1="113" y1="17" x2="113" y2="36" stroke="#9a8050" stroke-width="1.8" stroke-linecap="round"/>
+            <rect x="12" y="168" width="7" height="17" fill="#5a4020" rx="1"/>
+            <ellipse cx="15.5" cy="165" rx="2.5" ry="3.5" fill="#e8b850" opacity=".9" class="fl2"/>
+            <ellipse cx="15.5" cy="162" rx="1.2" ry="2.2" fill="#fff5cc" opacity=".7" class="fl2"/>
+            <rect x="165" y="168" width="7" height="17" fill="#5a4020" rx="1"/>
+            <ellipse cx="168.5" cy="165" rx="2.5" ry="3.5" fill="#e8b850" opacity=".9" class="fl1"/>
+            <ellipse cx="168.5" cy="162" rx="1.2" ry="2.2" fill="#fff5cc" opacity=".7" class="fl1"/>
+            <g id="bg1">
+              <circle id="a0" cx="113" cy="49" r="13" fill="none" stroke="#c8b080" stroke-width="1.7" visibility="hidden"/>
+              <line   id="a1" x1="113" y1="62" x2="113" y2="112" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <line   id="a2" x1="113" y1="82" x2="93"  y2="100" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <line   id="a3" x1="113" y1="82" x2="133" y2="100" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <line   id="a4" x1="113" y1="112" x2="96" y2="146" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <line   id="a5" x1="113" y1="112" x2="130" y2="146" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <g id="d1" visibility="hidden">
+                <line x1="107" y1="43" x2="110" y2="47" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+                <line x1="110" y1="43" x2="107" y2="47" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+                <line x1="116" y1="43" x2="119" y2="47" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+                <line x1="119" y1="43" x2="116" y2="47" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+                <path d="M107 56 Q113 51 119 56" fill="none" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+              </g>
+              <circle id="h1" cx="113" cy="33" r="9" fill="none" stroke="#c8a84a" stroke-width="1.1" stroke-dasharray="3.5 3.5" visibility="hidden" opacity=".8"/>
+              <g id="w1" visibility="hidden">
+                <circle cx="109" cy="46" r="1.8" fill="#70d090"/>
+                <circle cx="117" cy="46" r="1.8" fill="#70d090"/>
+                <path d="M107 54 Q113 59 119 54" fill="none" stroke="#70d090" stroke-width="1.7" stroke-linecap="round"/>
+              </g>
+            </g>
+          </svg>
+          <div class="gpips" id="gp1-pips"></div>
+          <div class="glabel" id="gl1">P1</div>
+        </div>
+
+        <!-- P2 gallows -->
+        <div class="gp" id="gp2">
+          <svg viewBox="0 0 184 200" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="92" cy="193" rx="60" ry="4.5" fill="rgba(0,0,0,0.35)"/>
+            <line x1="10" y1="186" x2="174" y2="186" stroke="#7a6030" stroke-width="2.5" stroke-linecap="round"/>
+            <rect x="42" y="10" width="7" height="176" fill="#7a6030" rx="1.5"/>
+            <rect x="42" y="10" width="74" height="7" fill="#7a6030" rx="1.5"/>
+            <line x1="49" y1="38" x2="75" y2="14" stroke="#6b5530" stroke-width="1.5" stroke-linecap="round" opacity=".7"/>
+            <line id="r2" x1="113" y1="17" x2="113" y2="36" stroke="#9a8050" stroke-width="1.8" stroke-linecap="round"/>
+            <rect x="12" y="168" width="7" height="17" fill="#5a4020" rx="1"/>
+            <ellipse cx="15.5" cy="165" rx="2.5" ry="3.5" fill="#e8b850" opacity=".9" class="fl2"/>
+            <ellipse cx="15.5" cy="162" rx="1.2" ry="2.2" fill="#fff5cc" opacity=".7" class="fl2"/>
+            <rect x="165" y="168" width="7" height="17" fill="#5a4020" rx="1"/>
+            <ellipse cx="168.5" cy="165" rx="2.5" ry="3.5" fill="#e8b850" opacity=".9" class="fl1"/>
+            <ellipse cx="168.5" cy="162" rx="1.2" ry="2.2" fill="#fff5cc" opacity=".7" class="fl1"/>
+            <g id="bg2">
+              <circle id="b0" cx="113" cy="49" r="13" fill="none" stroke="#c8b080" stroke-width="1.7" visibility="hidden"/>
+              <line   id="b1" x1="113" y1="62" x2="113" y2="112" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <line   id="b2" x1="113" y1="82" x2="93"  y2="100" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <line   id="b3" x1="113" y1="82" x2="133" y2="100" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <line   id="b4" x1="113" y1="112" x2="96" y2="146" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <line   id="b5" x1="113" y1="112" x2="130" y2="146" stroke="#c8b080" stroke-width="1.7" stroke-linecap="round" visibility="hidden"/>
+              <g id="d2" visibility="hidden">
+                <line x1="107" y1="43" x2="110" y2="47" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+                <line x1="110" y1="43" x2="107" y2="47" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+                <line x1="116" y1="43" x2="119" y2="47" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+                <line x1="119" y1="43" x2="116" y2="47" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+                <path d="M107 56 Q113 51 119 56" fill="none" stroke="#c84040" stroke-width="1.7" stroke-linecap="round"/>
+              </g>
+              <circle id="h2" cx="113" cy="33" r="9" fill="none" stroke="#4a8ac8" stroke-width="1.1" stroke-dasharray="3.5 3.5" visibility="hidden" opacity=".8"/>
+              <g id="w2" visibility="hidden">
+                <circle cx="109" cy="46" r="1.8" fill="#70d090"/>
+                <circle cx="117" cy="46" r="1.8" fill="#70d090"/>
+                <path d="M107 54 Q113 59 119 54" fill="none" stroke="#70d090" stroke-width="1.7" stroke-linecap="round"/>
+              </g>
+            </g>
+          </svg>
+          <div class="gpips" id="gp2-pips"></div>
+          <div class="glabel" id="gl2">P2</div>
+        </div>
+      </div>
+
+      <!-- Info panels -->
+      <div class="guess-info">
+        <div class="gi-panel">
+          <div class="gi-label" id="duel-range-lbl">Range</div>
+          <div class="gi-val" id="duel-range">1 – <span class="v">100</span></div>
+        </div>
+        <div class="gi-panel">
+          <div class="gi-label">Wrong</div>
+          <div class="chips" id="duel-chips"><span class="noguess">–</span></div>
+        </div>
+      </div>
+
+      <div class="status-wrap"><div class="status s-idle" id="duel-status">Player 1 goes first!</div></div>
+
+      <div class="npdisp-row">
+        <div class="npval emp" id="duel-npval">tap below</div>
+        <button class="guess-btn" id="duel-gbtn">Guess</button>
+      </div>
+      <div class="numpad" id="duel-numpad">
+        <button class="nk" data-v="1">1</button><button class="nk" data-v="2">2</button><button class="nk" data-v="3">3</button>
+        <button class="nk" data-v="4">4</button><button class="nk" data-v="5">5</button><button class="nk" data-v="6">6</button>
+        <button class="nk" data-v="7">7</button><button class="nk" data-v="8">8</button><button class="nk" data-v="9">9</button>
+        <button class="nk" data-v="0">0</button><button class="nk" data-v="00">00</button><button class="nk del" data-v="del">⌫</button>
+      </div>
+      <div class="brow">
+        <button class="new-btn" id="duel-new">✦ New Round</button>
+        <button class="menu-btn" id="duel-menu">Menu</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+function show(id){document.querySelectorAll('.scr').forEach(s=>s.classList.remove('active'));$(id).classList.add('active');}
+
+// ══════════════════════════════════════════
+//  SOLO MODE
+// ══════════════════════════════════════════
+const SOLO_PARTS=['s0','s1','s2','s3','s4','s5'];
+let soloSecret, soloWrong, soloGuessed, soloAlive, soloStr='';
+
+$('btn1p').onclick=()=>{
+  $('gsub').textContent='A game of numbers & fate';
+  startSolo();
+};
+$('solo-new').onclick=startSolo;
+$('solo-menu').onclick=()=>{show('mode-scr');$('gsub').textContent='A game of numbers & fate';};
+
+function startSolo(){
+  soloSecret=Math.floor(Math.random()*100)+1;
+  soloWrong=[]; soloGuessed=[]; soloAlive=true; soloStr='';
+  SOLO_PARTS.forEach(id=>{const e=$(id);e.setAttribute('visibility','hidden');e.classList.remove('pe');});
+  $('sdead').setAttribute('visibility','hidden');
+  $('shalo').setAttribute('visibility','hidden');
+  $('swin').setAttribute('visibility','hidden');
+  $('sbg').classList.remove('rsway','rs1');
+  $('sr').classList.remove('rsway','rs1');
+  $('solo-chips').innerHTML='<span class="noguess">–</span>';
+  $('solo-range').innerHTML='1 – <span class="v">100</span>';
+  setSoloStatus('What number dost thou name?','idle');
+  soloNpUpdate();
+  $('solo-gbtn').disabled=false;
+  $('solo-numpad').classList.remove('off');
+  renderSoloPips();
+  show('solo-scr');
+}
+
+function soloNpUpdate(){
+  const d=$('solo-npval');
+  if(soloStr===''){d.textContent='tap below';d.className='npval emp';}
+  else{d.textContent=soloStr;d.className='npval has';}
+}
+$('solo-numpad').addEventListener('click',e=>{
+  if(!soloAlive)return;
+  const b=e.target.closest('.nk');if(!b)return;
+  const v=b.dataset.v;
+  if(v==='del'){soloStr=soloStr.slice(0,-1);}
+  else{const n=soloStr+v;if(parseInt(n)>100||n.length>3||(soloStr===''&&(v==='0'||v==='00')))return;soloStr=n;}
+  soloNpUpdate();
+});
+$('solo-gbtn').onclick=()=>{
+  if(!soloAlive)return;
+  const val=parseInt(soloStr);soloStr='';soloNpUpdate();
+  if(isNaN(val)||val<1||val>100){setSoloStatus('Name a number betwixt 1 and 100.','idle');return;}
+  if(soloGuessed.includes(val)){setSoloStatus(`Already named ${val}!`,'idle');return;}
+  soloGuessed.push(val);
+  if(val===soloSecret){
+    $('shalo').setAttribute('visibility','visible');$('swin').setAttribute('visibility','visible');
+    setSoloStatus(`Victory! The number was ${soloSecret}.`,'win');
+    $('solo-gbtn').disabled=true;$('solo-numpad').classList.add('off');soloAlive=false;return;
+  }
+  soloWrong.push(val);
+  const pe=$(SOLO_PARTS[soloWrong.length-1]);pe.setAttribute('visibility','visible');pe.classList.add('pe');
+  renderSoloPips();
+  $('solo-chips').innerHTML=soloWrong.slice().sort((a,b)=>a-b).map(n=>`<span class="chip">${n}</span>`).join('');
+  if(soloWrong.length>=6){
+    $('sdead').setAttribute('visibility','visible');
+    $('sbg').classList.add('rsway','rs1');$('sr').classList.add('rsway','rs1');
+    setSoloStatus(`Condemned. The number was ${soloSecret}.`,'dead');
+    $('solo-gbtn').disabled=true;$('solo-numpad').classList.add('off');soloAlive=false;return;
+  }
+  const lo=Math.max(...soloGuessed.filter(g=>g<soloSecret),0)||1;
+  const hi=Math.min(...soloGuessed.filter(g=>g>soloSecret),101);
+  $('solo-range').innerHTML=`Between <span class="v">${lo}</span> – <span class="v">${hi<101?hi:100}</span>`;
+  const left=6-soloWrong.length,pl=left===1?'chance':'chances';
+  if(val<soloSecret)setSoloStatus(`Too low… ${left} ${pl} left.`,'low');
+  else setSoloStatus(`Too high… ${left} ${pl} left.`,'high');
+};
+function setSoloStatus(m,t){$('solo-status').textContent=m;$('solo-status').className='status s-'+t;}
+function renderSoloPips(){
+  const r=$('solo-pips');r.innerHTML='';
+  for(let i=0;i<6;i++){const d=document.createElement('div');d.className='gpip '+(i<(6-soloWrong.length)?'a1':'spent');r.appendChild(d);}
+}
+
+// ══════════════════════════════════════════
+//  DUEL MODE
+// ══════════════════════════════════════════
+const DP={1:['a0','a1','a2','a3','a4','a5'],2:['b0','b1','b2','b3','b4','b5']};
+let secrets={1:null,2:null}, scores={1:0,2:0};
+let state, guesser, roundOver, duelStr='', covStr='', covFor=null;
+let setupDone={1:false,2:false};
+
+$('btn2p').onclick=()=>{
+  $('gsub').textContent='Two souls — one gallows each';
+  scores={1:0,2:0};
+  startSetup();
+  show('setup-scr');
+};
+
+// ── Setup ──
+function startSetup(){
+  secrets={1:null,2:null};
+  setupDone={1:false,2:false};
+  $('step1').className='pstep';$('step2').className='pstep';
+  $('st1').textContent='Waiting…';$('st1').className='pstep-state pend';
+  $('st2').textContent='Waiting…';$('st2').className='pstep-state pend';
+  $('tk1').style.opacity='0';$('tk2').style.opacity='0';
+  $('sbtn1').disabled=false;$('sbtn2').disabled=true;
+  $('go-btn').disabled=true;$('go-btn').className='go-btn';
+}
+
+$('sbtn1').onclick=()=>openCover(1);
+$('sbtn2').onclick=()=>openCover(2);
+
+function openCover(player){
+  covFor=player; covStr=''; updateCovDisplay();
+  const box=$('cov-box');
+  $('cov-title').textContent=`Player ${player}`;
+  $('cov-title').className=`cov-title t${player}`;
+  $('cov-desc').textContent=`Player ${player}: set your secret number (1–100). Other player, look away!`;
+  $('cov-err').textContent='';
+  $('cov-confirm').className=`cov-confirm ${player===2?'c2btn':''}`;
+  box.className=`cov-box ${player===2?'c2':''}`;
+  $('cov').className='cov show';
+}
+function updateCovDisplay(){
+  const d=$('cov-display');
+  if(covStr===''){d.textContent='tap below';d.className='cov-val emp';}
+  else{d.textContent=covStr;d.className=`cov-val ${covFor===2?'c2has':'has'}`;}
+}
+$('cov-numpad').addEventListener('click',e=>{
+  const b=e.target.closest('.cnk');if(!b)return;
+  const v=b.dataset.v;
+  if(v==='del'){covStr=covStr.slice(0,-1);}
+  else{const n=covStr+v;if(parseInt(n)>100||n.length>3||(covStr===''&&(v==='0'||v==='00')))return;covStr=n;}
+  updateCovDisplay();
+});
+$('cov-confirm').onclick=()=>{
+  const v=parseInt(covStr);
+  if(isNaN(v)||v<1||v>100){$('cov-err').textContent='Enter a number from 1 to 100.';return;}
+  secrets[covFor]=v;
+  setupDone[covFor]=true;
+  $('cov').className='cov';
+  // Update setup UI
+  const step=$(`step${covFor}`), st=$(`st${covFor}`), tk=$(`tk${covFor}`);
+  step.className=`pstep done${covFor}`;
+  st.textContent='Number set ✓';st.className=`pstep-state set${covFor}`;
+  tk.style.opacity='1';
+  if(covFor===1){$('sbtn1').disabled=true;$('sbtn2').disabled=false;}
+  if(setupDone[1]&&setupDone[2]){$('go-btn').disabled=false;$('go-btn').className='go-btn ready';}
+};
+
+$('go-btn').onclick=()=>{if(!$('go-btn').disabled)startDuel();};
+
+// ── Duel ──
+function startDuel(){
+  state={
+    1:{wrong:[],guessed:[],alive:true},
+    2:{wrong:[],guessed:[],alive:true}
+  };
+  guesser=1; roundOver=false; duelStr='';
+  // Reset gallows
+  [1,2].forEach(p=>{
+    DP[p].forEach(id=>{const e=$(id);e.setAttribute('visibility','hidden');e.classList.remove('pe');});
+    $(`d${p}`).setAttribute('visibility','hidden');
+    $(`h${p}`).setAttribute('visibility','hidden');
+    $(`w${p}`).setAttribute('visibility','hidden');
+    $(`bg${p}`).classList.remove('rsway','rs1','rs2');
+    $(`r${p}`).classList.remove('rsway','rs1','rs2');
+  });
+  renderAllPips();
+  updateDuelBar();
+  refreshGuessInfo();
+  setDuelStatus(`Player 1 goes first — guess Player 2's secret!`,'idle');
+  $('duel-gbtn').disabled=false;$('duel-numpad').classList.remove('off');
+  duelNpUpdate();
+  show('duel-scr');
+}
+
+function duelNpUpdate(){
+  const d=$('duel-npval');
+  if(duelStr===''){d.textContent='tap below';d.className='npval emp';}
+  else{d.textContent=duelStr;d.className='npval has';}
+}
+$('duel-numpad').addEventListener('click',e=>{
+  if(roundOver)return;
+  const b=e.target.closest('.nk');if(!b)return;
+  const v=b.dataset.v;
+  if(v==='del'){duelStr=duelStr.slice(0,-1);}
+  else{const n=duelStr+v;if(parseInt(n)>100||n.length>3||(duelStr===''&&(v==='0'||v==='00')))return;duelStr=n;}
+  duelNpUpdate();
+});
+
+$('duel-gbtn').onclick=()=>{
+  if(roundOver)return;
+  const val=parseInt(duelStr); duelStr=''; duelNpUpdate();
+  const st=state[guesser];
+  // Player 1 guesses Player 2's secret, and vice versa
+  const target=secrets[guesser===1?2:1];
+  if(isNaN(val)||val<1||val>100){setDuelStatus('Name a number betwixt 1 and 100.','idle');return;}
+  if(st.guessed.includes(val)){setDuelStatus(`Already named ${val}!`,'idle');return;}
+  st.guessed.push(val);
+
+  if(val===target){
+    // Guesser wins — show their halo+win face on their own gallows
+    $(`h${guesser}`).setAttribute('visibility','visible');
+    $(`w${guesser}`).setAttribute('visibility','visible');
+    scores[guesser]++;
+    roundOver=true;
+    $('duel-gbtn').disabled=true;$('duel-numpad').classList.add('off');
+    updateDuelBar();
+    setTimeout(()=>showWin(guesser,'guess'),400);
+    return;
+  }
+
+  // Wrong guess — draw on the GUESSER's gallows (their life is at stake)
+  st.wrong.push(val);
+  const pe=$(DP[guesser][st.wrong.length-1]);
+  pe.setAttribute('visibility','visible');pe.classList.add('pe');
+  renderAllPips();
+  refreshGuessInfo();
+
+  if(st.wrong.length>=6){
+    // Guesser hanged — opponent wins
+    $(`d${guesser}`).setAttribute('visibility','visible');
+    $(`bg${guesser}`).classList.add('rsway',`rs${guesser}`);
+    $(`r${guesser}`).classList.add('rsway',`rs${guesser}`);
+    const winner=guesser===1?2:1;
+    scores[winner]++;
+    roundOver=true;
+    $('duel-gbtn').disabled=true;$('duel-numpad').classList.add('off');
+    updateDuelBar();
+    setTimeout(()=>showWin(winner,'hang'),400);
+    return;
+  }
+
+  // Switch turns
+  const left=6-st.wrong.length, pl=left===1?'chance':'chances';
+  const hint=val<target?'Too low':'Too high';
+  const next=guesser===1?2:1;
+  setDuelStatus(`${hint}! P${guesser} has ${left} ${pl} left. Player ${next}'s turn.`,val<target?'low':'high');
+  guesser=next;
+  updateDuelBar();
+  refreshGuessInfo();
+};
+
+function updateDuelBar(){
+  $('dp1').className='dp'+(guesser===1?' a1':'');
+  $('dp2').className='dp'+(guesser===2?' a2':'');
+  $('dp1s').textContent=scores[1];$('dp2s').textContent=scores[2];
+  $('dp1tag').textContent='▶ Guessing';$('dp2tag').textContent='▶ Guessing';
+  $('gp1').className='gp'+(guesser===1?' a1':'');
+  $('gp2').className='gp'+(guesser===2?' a2':'');
+  $('gl1').textContent=guesser===1?'▶ P1 Guessing':'P1 Waiting';
+  $('gl2').textContent=guesser===2?'▶ P2 Guessing':'P2 Waiting';
+  $('ws1').textContent=scores[1];$('ws2').textContent=scores[2];
+  $('wsc1').className='wsc-item'+(scores[1]>scores[2]?'  w1':'');
+  $('wsc2').className='wsc-item'+(scores[2]>scores[1]?' w2':'');
+}
+
+function refreshGuessInfo(){
+  const st=state[guesser];
+  const target=secrets[guesser===1?2:1];
+  // Chips: wrong guesses of current guesser
+  if(st.wrong.length===0){$('duel-chips').innerHTML='<span class="noguess">–</span>';}
+  else{$('duel-chips').innerHTML=st.wrong.slice().sort((a,b)=>a-b).map(n=>`<span class="chip">${n}</span>`).join('');}
+  // Range
+  if(st.guessed.length===0){$('duel-range').innerHTML='1 – <span class="v">100</span>';}
+  else{
+    const lo=Math.max(...st.guessed.filter(g=>g<target),0)||1;
+    const hi=Math.min(...st.guessed.filter(g=>g>target),101);
+    $('duel-range').innerHTML=`<span class="v">${lo}</span> – <span class="v">${hi<101?hi:100}</span>`;
+  }
+  $('duel-range-lbl').textContent=`P${guesser} Range`;
+}
+
+function renderAllPips(){
+  [1,2].forEach(p=>{
+    const r=$(`gp${p}-pips`);r.innerHTML='';
+    const st=state[p];
+    for(let i=0;i<6;i++){const d=document.createElement('div');d.className='gpip '+(i<(6-st.wrong.length)?`a${p}`:'spent');r.appendChild(d);}
+  });
+}
+
+function setDuelStatus(m,t){$('duel-status').textContent=m;$('duel-status').className='status s-'+t;}
+
+function showWin(winner,how){
+  $('wcrown').textContent=winner===1?'⚔':'🛡';
+  $('wtitle').textContent=`Player ${winner} Wins!`;
+  $('wtitle').className=`wtitle w${winner}`;
+  const loser=winner===1?2:1;
+  if(how==='guess'){
+    $('wsub').textContent=`Player ${winner} cracked the code! The secret was ${secrets[loser]}.`;
+  } else {
+    $('wsub').textContent=`Player ${loser} was hanged with ${secrets[loser===1?2:1]} still unknown. Player ${winner} survives!`;
+  }
+  $('ws1').textContent=scores[1];$('ws2').textContent=scores[2];
+  $('wsc1').className='wsc-item'+(scores[1]>scores[2]?' w1':'');
+  $('wsc2').className='wsc-item'+(scores[2]>scores[1]?' w2':'');
+  $('win-ov').className='win-ov show';
+}
+
+$('w-next').onclick=()=>{
+  $('win-ov').className='win-ov';
+  startSetup(); show('setup-scr');
+};
+$('w-menu').onclick=()=>{
+  $('win-ov').className='win-ov';
+  $('cov').className='cov';
+  show('mode-scr');$('gsub').textContent='A game of numbers & fate';
+};
+$('duel-new').onclick=()=>{startSetup();show('setup-scr');};
+$('duel-menu').onclick=()=>{show('mode-scr');$('gsub').textContent='A game of numbers & fate';};
+$('setup-menu').onclick=()=>{show('mode-scr');$('gsub').textContent='A game of numbers & fate';};
+</script>
+</body>
+</html>
